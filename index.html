@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video → Code</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a26;--border:#2a2a3a;--text:#e4e4ef;--text2:#8888a0;--accent:#00e87b;--accent2:#00c468;--red:#ff4466;--font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace}
+body{font-family:var(--font);background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+button{font-family:var(--font);cursor:pointer;border:none;outline:none}
+textarea,input{font-family:var(--font);outline:none}
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}
+.header h1{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.header h1 span{color:var(--accent)}
+.header-actions{display:flex;gap:8px;align-items:center}
+.btn{padding:7px 14px;border-radius:6px;font-size:13px;font-weight:500;transition:all .15s}
+.btn-primary{background:var(--accent);color:#000}.btn-primary:hover{background:var(--accent2)}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}.btn-secondary:hover{background:var(--border)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+/* API Key */
+.api-key-input{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:6px;font-size:12px;width:200px}
+/* Main Layout */
+.main{display:flex;flex:1;overflow:hidden}
+.left-panel{width:45%;min-width:380px;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow-y:auto}
+.right-panel{flex:1;display:flex;flex-direction:column;background:var(--surface)}
+/* Sections */
+.section{padding:16px 20px;border-bottom:1px solid var(--border)}
+.section-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+/* Drop Zone */
+.drop-zone{border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;transition:all .2s;cursor:pointer;background:var(--surface)}
+.drop-zone:hover,.drop-zone.dragover{border-color:var(--accent);background:rgba(0,232,123,.03)}
+.drop-zone p{color:var(--text2);font-size:13px;margin-top:6px}
+.drop-zone .icon{font-size:28px;margin-bottom:4px}
+/* Thumbnails */
+.thumbnails{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.thumb-wrap{position:relative;width:80px;height:60px;border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.thumb-wrap img,.thumb-wrap canvas{width:100%;height:100%;object-fit:cover}
+.thumb-wrap .remove{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.7);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.thumb-time{position:absolute;bottom:2px;left:2px;background:rgba(0,0,0,.7);color:#fff;font-size:9px;padding:1px 4px;border-radius:3px;font-family:var(--mono)}
+.video-info{font-size:12px;color:var(--text2);margin-top:8px;font-family:var(--mono)}
+/* Format Selector */
+.format-btns{display:flex;gap:6px}
+.format-btn{padding:8px 14px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:12px;font-weight:500;transition:all .15s}
+.format-btn:hover{border-color:var(--text2)}
+.format-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(0,232,123,.06)}
+.format-btn small{display:block;font-size:10px;color:var(--text2);margin-top:2px}
+/* Prompt */
+.prompt-area{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:12px;font-size:13px;resize:vertical;min-height:100px;line-height:1.5}
+.prompt-area::placeholder{color:var(--text2)}
+.prompt-area:focus{border-color:var(--accent)}
+/* Timeline */
+.timeline-container{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;min-height:60px}
+.timeline-track{height:6px;background:var(--surface2);border-radius:3px;position:relative;margin:8px 0}
+.timeline-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:3px;width:100%}
+.timeline-marker{position:absolute;top:-6px;width:3px;height:18px;background:var(--accent);border-radius:2px;transform:translateX(-50%);cursor:pointer}
+.timeline-marker::after{content:attr(data-label);position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--accent);white-space:nowrap;font-family:var(--mono)}
+.timeline-times{display:flex;justify-content:space-between;font-size:10px;color:var(--text2);font-family:var(--mono)}
+.timeline-empty{color:var(--text2);font-size:12px;text-align:center;padding:8px}
+/* Markers List */
+.markers-list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.marker-item{display:flex;align-items:center;gap:8px;padding:4px 8px;background:var(--surface2);border-radius:4px;font-size:11px}
+.marker-item .time{font-family:var(--mono);color:var(--accent);min-width:50px}
+.marker-item .label{color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Code Output */
+.code-header{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.code-header h2{font-size:13px;font-weight:600;color:var(--text2)}
+.code-actions{display:flex;gap:6px}
+.code-output{flex:1;overflow:auto;padding:16px 20px}
+.code-output pre{font-family:var(--mono);font-size:12px;line-height:1.6;color:#c8c8d8;white-space:pre-wrap;word-break:break-word}
+.code-output .placeholder{color:var(--text2);text-align:center;padding:60px 20px;font-size:13px}
+.code-output .placeholder .icon{font-size:40px;margin-bottom:12px;display:block}
+/* Status */
+.status-bar{padding:8px 20px;font-size:11px;color:var(--text2);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.status-bar .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.status-bar .dot.loading{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* Spinner */
+.generating{display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:12px;color:var(--text2)}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Toast */
+.toast{position:fixed;bottom:20px;right:20px;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all .2s}
+.toast.show{opacity:1;transform:translateY(0)}
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text2)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🎬 Video <span>→</span> Code</h1>
+  <div class="header-actions">
+    <input type="password" class="api-key-input" id="apiKey" placeholder="Anthropic API Key" />
+    <button class="btn btn-primary" id="generateBtn" disabled>⚡ Generate</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="left-panel">
+    <!-- Drop Zone -->
+    <div class="section">
+      <div class="section-title">📹 Reference Video</div>
+      <div class="drop-zone" id="dropZone">
+        <div class="icon">🎥</div>
+        <p>Drop video here or click to browse</p>
+        <p style="font-size:11px;margin-top:4px">mp4 · mov · webm</p>
+      </div>
+      <input type="file" id="fileInput" accept="video/mp4,video/quicktime,video/webm" hidden multiple>
+      <div class="thumbnails" id="thumbnails"></div>
+      <div class="video-info" id="videoInfo"></div>
+    </div>
+
+    <!-- Format -->
+    <div class="section">
+      <div class="section-title">📐 Format</div>
+      <div class="format-btns" id="formatBtns">
+        <button class="format-btn active" data-format="vertical">Vertical<small>1080×1920 · 9:16</small></button>
+        <button class="format-btn" data-format="landscape">Landscape<small>1920×1080 · 16:9</small></button>
+        <button class="format-btn" data-format="square">Square<small>1080×1080 · 1:1</small></button>
+      </div>
+    </div>
+
+    <!-- Prompt -->
+    <div class="section" style="flex:1;display:flex;flex-direction:column">
+      <div class="section-title">✏️ Prompt</div>
+      <textarea class="prompt-area" id="promptArea" placeholder='Describe what you want...
+
+Example: "Add Drake - Started From The Bottom at 0:05 with a fade in. Show the Glyfy logo centered from 0:12-0:18 with a scale-up animation. Add bass drop sound effect at 0:18. Use Montserrat bold for all text. Dark background with neon green accents."'></textarea>
+    </div>
+
+    <!-- Timeline -->
+    <div class="section">
+      <div class="section-title">⏱️ Timeline</div>
+      <div class="timeline-container" id="timelineContainer">
+        <div class="timeline-empty" id="timelineEmpty">Drop a video to see timeline</div>
+        <div id="timelineContent" style="display:none">
+          <div class="timeline-track"><div class="timeline-fill"></div><div id="timelineMarkers"></div></div>
+          <div class="timeline-times"><span id="timeStart">0:00</span><span id="timeEnd">0:00</span></div>
+          <div class="markers-list" id="markersList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="right-panel">
+    <div class="code-header">
+      <h2>Remotion Output</h2>
+      <div class="code-actions">
+        <button class="btn btn-secondary btn-sm" id="copyBtn" disabled>📋 Copy</button>
+        <button class="btn btn-secondary btn-sm" id="downloadBtn" disabled>💾 .tsx</button>
+        <button class="btn btn-secondary btn-sm" id="cursorBtn" disabled>🖱️ Cursor</button>
+      </div>
+    </div>
+    <div class="code-output" id="codeOutput">
+      <div class="placeholder">
+        <span class="icon">🎬</span>
+        Drop a video, write a prompt, and hit Generate<br>to get Remotion composition code
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <div class="dot" id="statusDot"></div>
+  <span id="statusText">Ready</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const REMOTION_SYSTEM_PROMPT = `You are an expert Remotion developer. Generate complete, production-ready Remotion composition code based on the user's video reference and prompt.
+
+## Output Format
+Return ONLY a single TypeScript/React file that can be saved as a .tsx file and used directly in a Remotion project. No markdown fences, no explanation — just the code.
+
+## Remotion Best Practices
+
+### Imports
+- Use \`import { Video } from "@remotion/media"\` for videos
+- Use \`import { Audio } from "@remotion/media"\` for audio
+- Use \`import { loadFont } from "@remotion/google-fonts/FontName"\` for Google Fonts
+- Use \`import { Composition, Sequence, useCurrentFrame, useVideoConfig, interpolate, spring, Easing, Img, AbsoluteFill, staticFile } from "remotion"\`
+- Use \`import { TransitionSeries, linearTiming } from "@remotion/transitions"\` for transitions
+- Use \`import { fade } from "@remotion/transitions/fade"\` etc. for transition types
+
+### Animations — CRITICAL
+- ALL animations MUST use \`useCurrentFrame()\` + \`interpolate()\` or \`spring()\`
+- CSS transitions and CSS animations are FORBIDDEN — they don't render in Remotion
+- Tailwind animation classes are FORBIDDEN
+- Always clamp interpolations: \`{ extrapolateRight: "clamp", extrapolateLeft: "clamp" }\`
+- Use fps from \`useVideoConfig()\` to convert seconds to frames: \`2 * fps\` = 2 seconds
+- Spring configs: smooth \`{damping:200}\`, snappy \`{damping:20,stiffness:200}\`, bouncy \`{damping:8}\`
+
+### Sequences & Timing
+- Use \`<Sequence from={startFrame} durationInFrames={dur}>\` for timing elements
+- Inside a Sequence, \`useCurrentFrame()\` returns LOCAL frame (starts at 0)
+- Always add \`premountFor={fps}\` to Sequences for smooth loading
+- Use \`<Series>\` for sequential non-overlapping elements
+- Nest Sequences for complex timing
+
+### Video
+- \`<Video src={staticFile("video.mp4")} />\` for local files
+- \`<Video src="https://..." />\` for remote URLs
+- Trim with \`trimBefore={frames}\` and \`trimAfter={frames}\`
+- Delay with wrapping in \`<Sequence from={delay}>\`
+- Volume: static \`volume={0.5}\` or dynamic \`volume={(f) => interpolate(f, ...)}\`
+- Mute with \`muted\`, speed with \`playbackRate={2}\`, loop with \`loop\`
+
+### Audio
+- \`<Audio src={staticFile("audio.mp3")} />\` for local, or remote URL
+- Trim: \`trimBefore={frames}\` \`trimAfter={frames}\`
+- Delay by wrapping in \`<Sequence from={delay}>\`
+- Volume: static or dynamic callback \`volume={(f) => interpolate(f, [0, fps], [0, 1], {extrapolateRight:"clamp"})}\`
+- Fade in audio: use volume callback with interpolate
+- Speed: \`playbackRate\`, loop: \`loop\`, pitch: \`toneFrequency\`
+
+### Fonts
+- Import: \`import { loadFont } from "@remotion/google-fonts/Montserrat"\`
+- Call at top level: \`const { fontFamily } = loadFont("normal", { weights: ["400","700"], subsets: ["latin"] })\`
+- Use \`fontFamily\` variable in style props
+
+### Images & Assets
+- Use \`<Img src={staticFile("image.png")} />\` for local assets
+- Use \`<Img src="https://..." />\` for remote
+- Always use Remotion's \`<Img>\` component (ensures loaded before render)
+
+### Compositions
+- Define with \`<Composition id="..." component={...} durationInFrames={...} fps={30} width={W} height={H} />\`
+- Export a \`RemotionRoot\` that contains the Composition
+- Also export the main component separately for flexibility
+
+### Transitions
+- Use \`<TransitionSeries>\` with \`<TransitionSeries.Sequence>\` and \`<TransitionSeries.Transition>\`
+- Available: fade, slide, wipe, flip, clockWipe
+- Timing: \`linearTiming({durationInFrames: N})\` or \`springTiming({config: {damping:200}})\`
+- Transitions overlap — total duration = sum of scenes minus transition durations
+
+### Text Animations
+- Typewriter: slice string by frame count, never per-character opacity
+- Word highlight: animate background/highlight per word
+- Always drive with useCurrentFrame()
+
+### Spring Animations
+- \`spring({ frame, fps, config: {damping, stiffness, mass} })\` returns 0→1
+- Combine with interpolate to map to custom ranges
+- Add entrance + exit: \`const scale = inSpring - outSpring\`
+- Use \`delay\` param or \`durationInFrames\` param as needed
+
+### Code Structure
+1. Font loading at top level
+2. Helper components (Title, Overlay, etc.)
+3. Main composition component using AbsoluteFill
+4. Sequences for each timed element
+5. RemotionRoot with Composition definition
+6. Export both the component and RemotionRoot
+
+### Common Patterns
+- Fade in: \`interpolate(frame, [0, fps], [0, 1], {extrapolateRight:"clamp"})\` on opacity
+- Scale up: \`spring({frame, fps, config:{damping:200}})\` on transform scale
+- Slide in: interpolate on translateX/translateY
+- Text reveal: clip-path or opacity with stagger delay per character/word
+- Ken Burns: slow interpolate on scale (1→1.1) over many frames
+- Color overlay: AbsoluteFill with background + animated opacity
+
+Always produce complete, runnable code. Include ALL imports. Use TypeScript types.`;
+
+// State
+let state = {
+  videos: [], // {file, url, duration, thumbnails: [{time, dataUrl}]}
+  format: 'vertical',
+  generatedCode: '',
+  generating: false,
+  markers: [] // {time, label} parsed from prompt
+};
+
+const formats = {
+  vertical: {w:1080,h:1920,label:'9:16'},
+  landscape: {w:1920,h:1080,label:'16:9'},
+  square: {w:1080,h:1080,label:'1:1'}
+};
+
+// Elements
+const $ = id => document.getElementById(id);
+const apiKeyEl = $('apiKey');
+const generateBtn = $('generateBtn');
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const thumbnailsEl = $('thumbnails');
+const videoInfoEl = $('videoInfo');
+const formatBtnsEl = $('formatBtns');
+const promptArea = $('promptArea');
+const codeOutput = $('codeOutput');
+const copyBtn = $('copyBtn');
+const downloadBtn = $('downloadBtn');
+const cursorBtn = $('cursorBtn');
+const statusDot = $('statusDot');
+const statusText = $('statusText');
+const toastEl = $('toast');
+
+// API Key persistence
+apiKeyEl.value = localStorage.getItem('anthropic_api_key') || '';
+apiKeyEl.addEventListener('input', () => {
+  localStorage.setItem('anthropic_api_key', apiKeyEl.value);
+  updateGenerateBtn();
+});
+
+// Toast
+function toast(msg, dur=2000) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), dur);
+}
+
+// Status
+function setStatus(text, loading=false) {
+  statusText.textContent = text;
+  statusDot.classList.toggle('loading', loading);
+}
+
+// Generate button state
+function updateGenerateBtn() {
+  generateBtn.disabled = !apiKeyEl.value || state.videos.length === 0 || !promptArea.value.trim() || state.generating;
+}
+promptArea.addEventListener('input', () => { updateGenerateBtn(); parseMarkers(); });
+
+// Format buttons
+formatBtnsEl.addEventListener('click', e => {
+  const btn = e.target.closest('.format-btn');
+  if (!btn) return;
+  formatBtnsEl.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  state.format = btn.dataset.format;
+});
+
+// Drop zone
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+async function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.match(/video\/(mp4|quicktime|webm)/)) continue;
+    setStatus('Processing video...', true);
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.src = url;
+    video.muted = true;
+    video.preload = 'auto';
+    
+    await new Promise(r => video.addEventListener('loadedmetadata', r, {once:true}));
+    await new Promise(r => video.addEventListener('canplay', r, {once:true}));
+    
+    const duration = video.duration;
+    const thumbCount = Math.min(6, Math.max(3, Math.floor(duration / 5)));
+    const thumbnails = [];
+    
+    for (let i = 0; i < thumbCount; i++) {
+      const time = (duration / (thumbCount + 1)) * (i + 1);
+      video.currentTime = time;
+      await new Promise(r => video.addEventListener('seeked', r, {once:true}));
+      const canvas = document.createElement('canvas');
+      canvas.width = 160; canvas.height = 120;
+      canvas.getContext('2d').drawImage(video, 0, 0, 160, 120);
+      thumbnails.push({time, dataUrl: canvas.toDataURL('image/jpeg', 0.7)});
+    }
+    
+    state.videos.push({file, url, duration, thumbnails, name: file.name});
+    video.remove();
+    setStatus('Ready');
+  }
+  renderThumbnails();
+  renderTimeline();
+  updateGenerateBtn();
+}
+
+function renderThumbnails() {
+  thumbnailsEl.innerHTML = '';
+  state.videos.forEach((v, vi) => {
+    v.thumbnails.forEach(t => {
+      const wrap = document.createElement('div');
+      wrap.className = 'thumb-wrap';
+      wrap.innerHTML = `<img src="${t.dataUrl}"><div class="thumb-time">${fmtTime(t.time)}</div>`;
+      thumbnailsEl.appendChild(wrap);
+    });
+  });
+  videoInfoEl.innerHTML = state.videos.map(v => `${v.name} · ${fmtTime(v.duration)}`).join('<br>');
+}
+
+function fmtTime(s) {
+  const m = Math.floor(s/60), sec = Math.floor(s%60);
+  return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+// Parse markers from prompt
+function parseMarkers() {
+  const text = promptArea.value;
+  const markers = [];
+  // Match patterns like "at 0:05", "from 0:12-0:18", "0:18"
+  const re = /(?:at|from|@)\s*(\d+:\d{2})(?:\s*[-–to]+\s*(\d+:\d{2}))?/gi;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const start = parseTime(m[1]);
+    const end = m[2] ? parseTime(m[2]) : null;
+    // Get surrounding context as label
+    const ctx = text.substring(Math.max(0, m.index - 30), m.index).split(/[.!]/).pop().trim();
+    markers.push({time: start, end, label: ctx || `Element at ${m[1]}`});
+  }
+  state.markers = markers;
+  renderTimeline();
+}
+
+function parseTime(str) {
+  const [m, s] = str.split(':').map(Number);
+  return m * 60 + s;
+}
+
+function renderTimeline() {
+  const dur = state.videos.reduce((a, v) => Math.max(a, v.duration), 0);
+  if (!dur) {
+    $('timelineEmpty').style.display = '';
+    $('timelineContent').style.display = 'none';
+    return;
+  }
+  $('timelineEmpty').style.display = 'none';
+  $('timelineContent').style.display = '';
+  $('timeStart').textContent = '0:00';
+  $('timeEnd').textContent = fmtTime(dur);
+  
+  const markersEl = $('timelineMarkers');
+  markersEl.innerHTML = '';
+  state.markers.forEach(mk => {
+    const pct = (mk.time / dur) * 100;
+    const div = document.createElement('div');
+    div.className = 'timeline-marker';
+    div.style.left = pct + '%';
+    div.dataset.label = fmtTime(mk.time);
+    markersEl.appendChild(div);
+  });
+  
+  const listEl = $('markersList');
+  listEl.innerHTML = '';
+  state.markers.forEach(mk => {
+    const item = document.createElement('div');
+    item.className = 'marker-item';
+    const timeStr = mk.end ? `${fmtTime(mk.time)}-${fmtTime(mk.end)}` : fmtTime(mk.time);
+    item.innerHTML = `<span class="time">${timeStr}</span><span class="label">${mk.label}</span>`;
+    listEl.appendChild(item);
+  });
+}
+
+// Generate
+generateBtn.addEventListener('click', generate);
+
+async function generate() {
+  const apiKey = apiKeyEl.value.trim();
+  if (!apiKey) return toast('Enter API key');
+  if (state.videos.length === 0) return toast('Add a video first');
+  if (!promptArea.value.trim()) return toast('Write a prompt');
+  
+  state.generating = true;
+  updateGenerateBtn();
+  setStatus('Generating Remotion code...', true);
+  codeOutput.innerHTML = '<div class="generating"><div class="spinner"></div><div>Generating Remotion code with Claude...</div></div>';
+  
+  const fmt = formats[state.format];
+  
+  // Build content with reference frames
+  const content = [];
+  
+  // Add thumbnails as images
+  for (const v of state.videos) {
+    for (const t of v.thumbnails) {
+      content.push({
+        type: 'image',
+        source: {type: 'base64', media_type: 'image/jpeg', data: t.dataUrl.split(',')[1]}
+      });
+      content.push({
+        type: 'text',
+        text: `[Keyframe from "${v.name}" at ${fmtTime(t.time)} — video duration: ${fmtTime(v.duration)}]`
+      });
+    }
+  }
+  
+  // Add the main prompt
+  let userPrompt = `## Video Details\n`;
+  state.videos.forEach(v => {
+    userPrompt += `- File: ${v.name}, Duration: ${fmtTime(v.duration)} (${v.duration.toFixed(1)}s)\n`;
+  });
+  userPrompt += `\n## Format\n${fmt.w}×${fmt.h} (${formats[state.format].label}) at 30fps\n`;
+  userPrompt += `\n## Duration in frames\n${Math.ceil(state.videos[0].duration * 30)} frames (${state.videos[0].duration.toFixed(1)}s)\n`;
+  
+  if (state.markers.length) {
+    userPrompt += `\n## Timeline Markers\n`;
+    state.markers.forEach(mk => {
+      const timeStr = mk.end ? `${fmtTime(mk.time)}-${fmtTime(mk.end)}` : fmtTime(mk.time);
+      userPrompt += `- ${timeStr}: ${mk.label}\n`;
+    });
+  }
+  
+  userPrompt += `\n## User Request\n${promptArea.value}\n`;
+  userPrompt += `\nGenerate a complete Remotion composition. Use the video file name "${state.videos[0].name}" with staticFile(). Output ONLY the .tsx code, no markdown.`;
+  
+  content.push({type: 'text', text: userPrompt});
+  
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 8192,
+        system: REMOTION_SYSTEM_PROMPT,
+        messages: [{role: 'user', content}]
+      })
+    });
+    
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${resp.status}`);
+    }
+    
+    const data = await resp.json();
+    let code = data.content[0].text;
+    
+    // Strip markdown fences if present
+    code = code.replace(/^```(?:tsx?|typescript|javascript)?\n?/gm, '').replace(/```\s*$/gm, '').trim();
+    
+    state.generatedCode = code;
+    renderCode(code);
+    setStatus('Code generated successfully');
+    copyBtn.disabled = false;
+    downloadBtn.disabled = false;
+    cursorBtn.disabled = false;
+  } catch (e) {
+    codeOutput.innerHTML = `<div class="placeholder" style="color:var(--red)"><span class="icon">❌</span>${e.message}</div>`;
+    setStatus('Generation failed');
+  }
+  
+  state.generating = false;
+  updateGenerateBtn();
+}
+
+function renderCode(code) {
+  const pre = document.createElement('pre');
+  pre.textContent = code;
+  codeOutput.innerHTML = '';
+  codeOutput.appendChild(pre);
+}
+
+// Export actions
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(state.generatedCode);
+  toast('Copied to clipboard!');
+});
+
+downloadBtn.addEventListener('click', () => {
+  const blob = new Blob([state.generatedCode], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'VideoComposition.tsx';
+  a.click();
+  toast('Downloaded .tsx file');
+});
+
+cursorBtn.addEventListener('click', () => {
+  const cursorPrompt = `I need help setting up this Remotion composition in my project.\n\nHere's the generated code:\n\n\`\`\`tsx\n${state.generatedCode}\n\`\`\`\n\nPlease:\n1. Make sure all dependencies are installed (@remotion/media, @remotion/google-fonts, etc.)\n2. Place this in src/compositions/\n3. Register it in src/Root.tsx\n4. Add any referenced assets to public/\n5. Test with \`npx remotion studio\``;
+  navigator.clipboard.writeText(cursorPrompt);
+  toast('Copied Cursor prompt!');
+});
+
+// Init
+updateGenerateBtn();
+</script>
+</body>
+</html>
