@@ -117,6 +117,18 @@ textarea,input{font-family:var(--font);outline:none}
       <div class="video-info" id="videoInfo"></div>
     </div>
 
+    <!-- Background Music -->
+    <div class="section">
+      <div class="section-title">🎵 Background Music</div>
+      <div class="drop-zone" id="audioDropZone" style="padding:18px">
+        <div class="icon" style="font-size:22px">🎶</div>
+        <p>Drop audio or click to browse</p>
+        <p style="font-size:11px;margin-top:4px">mp3 · wav · m4a · ogg · aac</p>
+      </div>
+      <input type="file" id="audioFileInput" accept="audio/mpeg,audio/wav,audio/mp4,audio/ogg,audio/aac,audio/x-m4a" hidden multiple>
+      <div id="audioList"></div>
+    </div>
+
     <!-- Format -->
     <div class="section">
       <div class="section-title">📐 Format</div>
@@ -274,6 +286,7 @@ Always produce complete, runnable code. Include ALL imports. Use TypeScript type
 // State
 let state = {
   videos: [], // {file, url, duration, thumbnails: [{time, dataUrl}]}
+  audioFiles: [], // {file, url, duration, name}
   format: 'vertical',
   generatedCode: '',
   generating: false,
@@ -349,6 +362,55 @@ dropZone.addEventListener('drop', e => {
   handleFiles(e.dataTransfer.files);
 });
 fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+// Audio drop zone
+const audioDropZone = $('audioDropZone');
+const audioFileInput = $('audioFileInput');
+const audioListEl = $('audioList');
+
+audioDropZone.addEventListener('click', () => audioFileInput.click());
+audioDropZone.addEventListener('dragover', e => { e.preventDefault(); audioDropZone.classList.add('dragover'); });
+audioDropZone.addEventListener('dragleave', () => audioDropZone.classList.remove('dragover'));
+audioDropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  audioDropZone.classList.remove('dragover');
+  handleAudioFiles(e.dataTransfer.files);
+});
+audioFileInput.addEventListener('change', e => handleAudioFiles(e.target.files));
+
+async function handleAudioFiles(files) {
+  for (const file of files) {
+    if (!file.type.startsWith('audio/')) continue;
+    const url = URL.createObjectURL(file);
+    const duration = await new Promise(resolve => {
+      const audio = new Audio();
+      audio.src = url;
+      audio.addEventListener('loadedmetadata', () => resolve(audio.duration));
+      audio.addEventListener('error', () => resolve(0));
+    });
+    state.audioFiles.push({ file, url, duration, name: file.name });
+  }
+  renderAudioList();
+  updateGenerateBtn();
+}
+
+function renderAudioList() {
+  audioListEl.innerHTML = state.audioFiles.map((a, i) => {
+    const dur = a.duration ? `${Math.floor(a.duration / 60)}:${String(Math.floor(a.duration % 60)).padStart(2, '0')}` : '--:--';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:6px;background:var(--surface2);border-radius:6px;border:1px solid var(--border);font-size:12px">
+      <span style="color:var(--accent)">🎵</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</span>
+      <span style="color:var(--text2);font-family:var(--mono);font-size:11px">${dur}</span>
+      <button onclick="removeAudio(${i})" style="background:none;color:var(--text2);font-size:14px;padding:0 4px">&times;</button>
+    </div>`;
+  }).join('');
+}
+
+function removeAudio(i) {
+  URL.revokeObjectURL(state.audioFiles[i].url);
+  state.audioFiles.splice(i, 1);
+  renderAudioList();
+}
 
 async function handleFiles(files) {
   for (const file of files) {
@@ -510,8 +572,20 @@ async function generate() {
     });
   }
   
+  if (state.audioFiles.length) {
+    userPrompt += `\n## Background Music / Audio Files\n`;
+    state.audioFiles.forEach(a => {
+      userPrompt += `- File: "${a.name}", Duration: ${fmtTime(a.duration)} (${a.duration.toFixed(1)}s)\n`;
+    });
+    userPrompt += `Use these with <Audio src={staticFile("filename")} /> in the composition. Layer them with the video. Use volume callbacks for fading in/out. The user may reference these in their prompt for timing.\n`;
+  }
+
   userPrompt += `\n## User Request\n${promptArea.value}\n`;
-  userPrompt += `\nGenerate a complete Remotion composition. Use the video file name "${state.videos[0].name}" with staticFile(). Output ONLY the .tsx code, no markdown.`;
+  userPrompt += `\nGenerate a complete Remotion composition. Use the video file name "${state.videos[0].name}" with staticFile().`;
+  if (state.audioFiles.length) {
+    userPrompt += ` Audio files: ${state.audioFiles.map(a => '"' + a.name + '"').join(', ')} — use with staticFile().`;
+  }
+  userPrompt += ` Output ONLY the .tsx code, no markdown.`;
   
   content.push({type: 'text', text: userPrompt});
   
